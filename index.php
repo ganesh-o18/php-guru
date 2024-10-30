@@ -6,63 +6,72 @@ use PhpParser\Error;
 use PhpParser\Node;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
-use PhpParser\PrettyPrinter\Standard;
 use PhpParser\NodeTraverser;
+use PhpParser\PrettyPrinter\Standard;
 
 class CamelCaseVisitor extends NodeVisitorAbstract
 {
-  
-  public $ingnoreVars = ['_GET', '_POST', '_SERVER', '_SESSION', '_REQUEST'];
+    private $replacements = [];
 
-  public function enterNode(Node $node)
-  {
-    // Only process variable names (Node\Expr\Variable)
-    if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
-      $nodeName = $node->name;
-      if (in_array($node->name, $this->ingnoreVars)) {
-        return;
-      }
-      $camelCaseName = $this->toCamelCase($node->name);
-      if ($camelCaseName !== $node->name) {
-        $node->name = $camelCaseName; // Update the variable name
-      }
+    public function enterNode(Node $node)
+    {
+        // Only process variables that aren't superglobals (no leading underscore)
+        if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
+            if (strpos($node->name, '_') === 0) {
+                return; // Ignore variables like $_GET, $_POST, etc.
+            }
+
+            $camelCaseName = $this->toCamelCase($node->name);
+            if ($camelCaseName !== $node->name) {
+                // Store the original and new variable name for replacement
+                $this->replacements[$node->name] = $camelCaseName;
+            }
+        }
     }
-  }
 
-  // Convert snake_case or other non-camel to camelCase
-  private function toCamelCase($name)
-  {
-    return lcfirst(str_replace('_', '', ucwords($name, '_')));
-  }
+    private function toCamelCase($name)
+    {
+        return lcfirst(str_replace('_', '', ucwords($name, '_')));
+    }
+
+    // Replace variables in the original code using the stored replacements
+    public function getModifiedCode($originalCode)
+    {
+        $modifiedCode = $originalCode;
+        foreach ($this->replacements as $oldName => $newName) {
+            // Use word boundaries (\b) to avoid partial replacements
+            $modifiedCode = preg_replace('/\b' . preg_quote($oldName, '/') . '\b/', $newName, $modifiedCode);
+        }
+        return $modifiedCode;
+    }
 }
 
-// Sample PHP code to parse
+// Sample PHP code to parse (can be replaced with file input)
 $code = <<<'CODE'
 <?php
 $some_var = 1;
+$_GET = 'value';
 $another_example_var = 2;
 echo $some_var + $another_example_var;
 CODE;
 
-$code = file_get_contents('../m/__get.php');
-print($code);
-print(PHP_EOL);
+$code = file_get_contents('../m/coupon.php');
 // Parse the code
 $parser = (new ParserFactory)->create(ParserFactory::PREFER_PHP7);
 try {
-  $ast = $parser->parse($code);
+    $ast = $parser->parse($code);
 } catch (Error $e) {
-  echo "Parse error: {$e->getMessage()}\n";
-  exit(1);
+    echo "Parse error: {$e->getMessage()}\n";
+    exit(1);
 }
 
 // Traverse and modify the AST
 $traverser = new NodeTraverser();
-$traverser->addVisitor(new CamelCaseVisitor());
-$modifiedAst = $traverser->traverse($ast);
+$visitor = new CamelCaseVisitor();
+$traverser->addVisitor($visitor);
+$traverser->traverse($ast);
 
-// Pretty-print the modified code
-$prettyPrinter = new Standard();
-$newCode = $prettyPrinter->prettyPrintFile($modifiedAst);
-file_put_contents('../m/__get.php', $newCode);
-echo "Modified Code:\n$newCode\n";
+// Print the modified code without formatting changes
+$modifiedCode = $visitor->getModifiedCode($code);
+echo "Modified Code:\n$modifiedCode\n";
+file_put_contents('../m/coupon.php', $modifiedCode);
