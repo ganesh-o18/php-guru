@@ -17,8 +17,8 @@ class CamelCaseVisitor extends NodeVisitorAbstract
     {
         // Only process variables that aren't superglobals (no leading underscore)
         if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
-            if (strpos($node->name, '_') === 0) {
-                return; // Ignore variables like $_GET, $_POST, etc.
+            if (strpos($node->name, '_') === 0) { 
+                return; // Ignore variables like $_GET, $_POST, etc. but process var like $Offer_Data
             }
 
             $camelCaseName = $this->toCamelCase($node->name);
@@ -46,17 +46,8 @@ class CamelCaseVisitor extends NodeVisitorAbstract
     }
 }
 
-// Sample PHP code to parse (can be replaced with file input)
-$code = <<<'CODE'
-<?php
-$some_var = 1;
-$_GET = 'value';
-$another_example_var = 2;
-echo $some_var + $another_example_var;
-CODE;
-
 $code = file_get_contents('../m/coupon.php');
-// Parse the code
+
 $parser = (new ParserFactory)->create(ParserFactory::PREFER_PHP7);
 try {
     $ast = $parser->parse($code);
