@@ -11,10 +11,17 @@ use PhpParser\NodeTraverser;
 
 class CamelCaseVisitor extends NodeVisitorAbstract
 {
+  
+  public $ingnoreVars = ['_GET', '_POST', '_SERVER', '_SESSION', '_REQUEST'];
+
   public function enterNode(Node $node)
   {
     // Only process variable names (Node\Expr\Variable)
     if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
+      $nodeName = $node->name;
+      if (in_array($node->name, $this->ingnoreVars)) {
+        return;
+      }
       $camelCaseName = $this->toCamelCase($node->name);
       if ($camelCaseName !== $node->name) {
         $node->name = $camelCaseName; // Update the variable name
