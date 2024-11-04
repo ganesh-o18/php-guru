@@ -31,6 +31,9 @@ class CamelCaseVisitor extends NodeVisitorAbstract
 
     private function toCamelCase($name)
     {
+        if (strtoupper($name) === $name) {
+            return $name;
+        }
         return lcfirst(str_replace('_', '', ucwords($name, '_')));
     }
 
@@ -46,7 +49,8 @@ class CamelCaseVisitor extends NodeVisitorAbstract
     }
 }
 
-$code = file_get_contents('../m/coupon.php');
+$FILE = 'change_logs.php';
+$code = file_get_contents('../m/' . $FILE);
 
 $parser = (new ParserFactory)->create(ParserFactory::PREFER_PHP7);
 try {
@@ -65,4 +69,4 @@ $traverser->traverse($ast);
 // Print the modified code without formatting changes
 $modifiedCode = $visitor->getModifiedCode($code);
 echo "Modified Code:\n$modifiedCode\n";
-file_put_contents('../m/coupon.php', $modifiedCode);
+file_put_contents('../m/'. $FILE, $modifiedCode);
