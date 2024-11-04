@@ -43,13 +43,13 @@ class CamelCaseVisitor extends NodeVisitorAbstract
         $modifiedCode = $originalCode;
         foreach ($this->replacements as $oldName => $newName) {
             // Use word boundaries (\b) to avoid partial replacements
-            $modifiedCode = preg_replace('/\b' . preg_quote($oldName, '/') . '\b/', $newName, $modifiedCode);
+            $modifiedCode = preg_replace('/\$' . preg_quote($oldName, '/') . '\b/', '$'.$newName, $modifiedCode);
         }
         return $modifiedCode;
     }
 }
 
-$FILE = 'change_logs.php';
+$FILE = 'offer_tracking_link.php';
 $code = file_get_contents('../m/' . $FILE);
 
 $parser = (new ParserFactory)->create(ParserFactory::PREFER_PHP7);
