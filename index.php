@@ -12,13 +12,23 @@ use PhpParser\PrettyPrinter\Standard;
 class CamelCaseVisitor extends NodeVisitorAbstract
 {
     private $replacements = [];
+    private $globalVariables = [];
 
     public function enterNode(Node $node)
     {
-        // Only process variables that aren't superglobals (no leading underscore)
+        // Track variables defined as global
+        if ($node instanceof Node\Stmt\Global_) {
+            foreach ($node->vars as $var) {
+                if ($var instanceof Node\Expr\Variable && is_string($var->name)) {
+                    $this->globalVariables[] = $var->name;
+                }
+            }
+        }
+
+        // Only process variables that aren't superglobals or globals
         if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
-            if (strpos($node->name, '_') === 0) { 
-                return; // Ignore variables like $_GET, $_POST, etc. but process var like $Offer_Data
+            if (strpos($node->name, '_') === 0 || in_array($node->name, $this->globalVariables, true)) {
+                return; // Ignore superglobals and global variables
             }
 
             $camelCaseName = $this->toCamelCase($node->name);
@@ -34,6 +44,9 @@ class CamelCaseVisitor extends NodeVisitorAbstract
         if (strtoupper($name) === $name) {
             return $name;
         }
+        if ($name == 'Root_Account_Data') {
+            return $name;
+        }
         return lcfirst(str_replace('_', '', ucwords($name, '_')));
     }
 
@@ -43,13 +56,13 @@ class CamelCaseVisitor extends NodeVisitorAbstract
         $modifiedCode = $originalCode;
         foreach ($this->replacements as $oldName => $newName) {
             // Use word boundaries (\b) to avoid partial replacements
-            $modifiedCode = preg_replace('/\$' . preg_quote($oldName, '/') . '\b/', '$'.$newName, $modifiedCode);
+            $modifiedCode = preg_replace('/\b' . preg_quote($oldName, '/') . '\b/', $newName, $modifiedCode);
         }
         return $modifiedCode;
     }
 }
 
-$FILE = 'offer_tracking_link.php';
+$FILE = 'logs_report_data.php';
 $code = file_get_contents('../m/' . $FILE);
 
 $parser = (new ParserFactory)->create(ParserFactory::PREFER_PHP7);
@@ -69,4 +82,4 @@ $traverser->traverse($ast);
 // Print the modified code without formatting changes
 $modifiedCode = $visitor->getModifiedCode($code);
 echo "Modified Code:\n$modifiedCode\n";
-file_put_contents('../m/'. $FILE, $modifiedCode);
+file_put_contents('../m/' . $FILE, $modifiedCode);
