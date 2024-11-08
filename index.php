@@ -7,11 +7,10 @@ use PhpParser\Node;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
 use PhpParser\NodeTraverser;
-use PhpParser\PrettyPrinter\Standard;
 
 class CamelCaseVisitor extends NodeVisitorAbstract
 {
-    private $replacements = [];
+    public $replacements = [];
     private $globalVariables = [];
 
     public function enterNode(Node $node)
@@ -34,7 +33,7 @@ class CamelCaseVisitor extends NodeVisitorAbstract
             $camelCaseName = $this->toCamelCase($node->name);
             if ($camelCaseName !== $node->name) {
                 // Store the original and new variable name for replacement
-                $this->replacements[$node->name] = $camelCaseName;
+                $this->replacements['$' . $node->name] = '$' . $camelCaseName;
             }
         }
     }
@@ -49,20 +48,10 @@ class CamelCaseVisitor extends NodeVisitorAbstract
         }
         return lcfirst(str_replace('_', '', ucwords($name, '_')));
     }
-
-    // Replace variables in the original code using the stored replacements
-    public function getModifiedCode($originalCode)
-    {
-        $modifiedCode = $originalCode;
-        foreach ($this->replacements as $oldName => $newName) {
-            // Use word boundaries (\b) to avoid partial replacements
-            $modifiedCode = preg_replace('/\b' . preg_quote($oldName, '/') . '\b/', $newName, $modifiedCode);
-        }
-        return $modifiedCode;
-    }
 }
 
-$FILE = 'logs_report_data.php';
+// Load and parse the code
+$FILE = 'settings.php';
 $code = file_get_contents('../m/' . $FILE);
 
 $parser = (new ParserFactory)->create(ParserFactory::PREFER_PHP7);
@@ -73,13 +62,30 @@ try {
     exit(1);
 }
 
-// Traverse and modify the AST
+// Traverse and collect variable replacements
 $traverser = new NodeTraverser();
 $visitor = new CamelCaseVisitor();
 $traverser->addVisitor($visitor);
 $traverser->traverse($ast);
 
-// Print the modified code without formatting changes
-$modifiedCode = $visitor->getModifiedCode($code);
+// Tokenize code and replace variable names based on collected replacements
+$tokens = token_get_all($code);
+$modifiedCode = '';
+
+foreach ($tokens as $token) {
+    if (is_array($token)) {
+        list($id, $text) = $token;
+
+        // Replace variable names only if they match
+        if ($id === T_VARIABLE && isset($visitor->replacements[$text])) {
+            $text = $visitor->replacements[$text];
+        }
+        $modifiedCode .= $text;
+    } else {
+        // Append non-array tokens directly
+        $modifiedCode .= $token;
+    }
+}
+
 echo "Modified Code:\n$modifiedCode\n";
 file_put_contents('../m/' . $FILE, $modifiedCode);
